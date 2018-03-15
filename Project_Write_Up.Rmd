@@ -1,0 +1,151 @@
+---
+title: "Practical Machine Learning Project"
+author: "AbdulRafaeMohammed"
+date: "March 14, 2018"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Practical Machine Learning Project and Quiz
+
+##Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, our goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##Data
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+
+For this quiz, I am using specific versions of the above libraries so answers may vary a little because of the version difference.
+
+##Pre-Requisites
+
+```{r setup, include=FALSE,eval=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning=FALSE, message=FALSE, fig.width=10, fig.height=5)
+library(caret)
+library(ElemStatLearn)
+library(mgcv)
+library(nlme)
+library(forecast)
+library(plyr)
+library(e1071)
+library(MASS)
+library(dplyr)
+library(randomForest)
+library(rpart)
+library(AppliedPredictiveModeling)
+library(pgmm)
+library(rpart)
+library(gbm)
+library(lubridate)
+library(elasticnet)
+library(lars)
+options(width=120)
+set.seed(1979)
+
+trainData <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testData <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+train <- "./dataSet/pml-training.csv"
+test  <- "./dataSet/pml-testing.csv"
+if (!file.exists("./data")) {
+  dir.create("./dataSet")
+}
+if (!file.exists(train)) {
+  download.file(trainData, destfile=train, method="curl")
+}
+if (!file.exists(test)) {
+  download.file(testData, destfile=test, method="curl")
+}
+```
+
+##Reading the DataSets
+We read the data after downloading them using the read.csv function and chcekc their dimansions.
+```{r echo = TRUE,eval=FALSE}
+trainRaw <- read.csv("./dataSet/pml-training.csv")
+testRaw <- read.csv("./dataSet/pml-testing.csv")
+dim(trainRaw)
+dim(testRaw)
+```
+
+
+##processing the Data
+
+###Getting rid of the Incomplete Cases, Null Values and Irrelevant Features.
+```{r echo = TRUE,eval=FALSE}
+sum(complete.cases(trainRaw))
+trainProcess <- trainRaw[, colSums(is.na(trainRaw)) == 0]
+testProcess <- testRaw[, colSums(is.na(testRaw)) == 0]
+
+classe <- trainProcess$classe
+trainRemove <- grepl("^X|timestamp|window", names(trainProcess))
+trainProcess <- trainProcess[, !trainRemove]
+trainReady <- trainProcess[, sapply(trainProcess, is.numeric)]
+trainReady$classe <- classe
+testRemove <- grepl("^X|timestamp|window", names(testProcess))
+testProcess <- testProcess[, !testRemove]
+testReady <- testProcess[, sapply(testProcess, is.numeric)]
+```
+
+##Splitting the DataSet into test and training sets
+
+
+### Setting the seed to reproduce the sets again.
+### Splitting into test and train.
+```{r echo = TRUE,eval=FALSE}
+set.seed(321456)
+Train <- createDataPartition(trainReady$classe, p=0.70, list=F)
+train <- trainReady[Train, ]
+test <- trainReady[-Train, ]
+```
+
+
+##Predictive Model
+
+
+###Train a Random Forest using the training data.
+```{r echo = TRUE,eval=FALSE}
+controlRf <- trainControl(method="cv", 5)
+model_Rand_Forest <- train(classe ~ ., data=train, method="rf", trControl=controlRf, ntree=250)
+model_Rand_Forest
+```
+
+
+###Predict the values using the models.
+```{r echo = TRUE,eval=FALSE}
+predict_Rand_forest <- predict(model_Rand_Forest, test)
+confusionMatrix(test$classe, predict_Rand_forest)
+```
+
+
+###Check the accuracy.
+The estimated accuracy of the model is 99.30%
+```{r echo = TRUE,eval=FALSE}
+accuracy <- postResample(predict_Rand_forest, test$classe)
+accuracy
+```
+
+
+###Convert the data type.
+The estimated out-of-sample error is 70%.
+```{r echo = TRUE,eval=FALSE}
+out_of_sample_error <- 1 - as.numeric(confusionMatrix(test$classe, predict_Rand_forest)$overall[1])
+out_of_sample_error
+```
+
+###Predicting the values on Test Data
+
+```{r echo = TRUE,eval=FALSE}
+prediction <- predict(model_Rand_Forest, testReady[, -length(names(testReady))])
+prediction
+```
+
+
+##The End
